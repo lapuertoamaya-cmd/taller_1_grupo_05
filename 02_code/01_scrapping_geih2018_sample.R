@@ -146,7 +146,7 @@ tabla_directa[[1]]
 # (6) Crear una funcion auxiliar para extraer cada tabla
 # ------------------------------------------------------------------------------
 
-extraer_tabla <- function(link) {
+extraer_tabla <- function(link, chunk_id) {
   
   # (6.1) Hacer una pausa responsable antes de cada solicitud
   Sys.sleep(runif(1, 2, 4))
@@ -158,7 +158,8 @@ extraer_tabla <- function(link) {
   # (6.3) Extraer la primera tabla del HTML
   tabla[[1]] %>%
     rename(id_fila = 1) %>%
-    mutate(url_origen = link)
+    mutate(chunk=chunk_id,
+           url_origen = link) # para tener un id del chunk
 }
 
 # (6.4) Crear una version segura de la funcion
@@ -170,7 +171,7 @@ extraer_tabla_segura <- possibly(extraer_tabla, otherwise = NULL)
 # ------------------------------------------------------------------------------
 
 # (7.1) Aplicar la funcion a las 10 URLs
-base_final <- map(Url_tablas, extraer_tabla_segura) %>%
+base_final <- map2(Url_tablas, 1:10, extraer_tabla_segura) %>%
   compact() %>%
   bind_rows()
 
