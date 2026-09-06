@@ -15,6 +15,7 @@
 
 install.packages("dplyr")
 library(dplyr)
+library(tidyverse)
 
 # 1. Restringir la muestra
 muestra <- base_final %>%
@@ -30,7 +31,7 @@ text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1', '
                'nivel_educativo_alto' = 'p6210', 'Grado_escolar_aprobado' = 'p6210s1',
                'actividad_ultima_semana' = 'p6240', 'cotizante' = 'p6920', 'pet' = 'pet',
                'llave_hogar' = 'secuencia_p', 'horas_trabajadas' = 'totalHoursWorked',
-               'ingreso_total' = 'y_total_m')
+               'ingreso_total' = 'y_total_m',  'chunk_origen' = 'url_origen')
 
 base_analisis <- muestra %>%
   select(all_of(text_vars))
@@ -47,7 +48,7 @@ base_analisis <- base_analisis %>%
     )
   )
 
-#Construcción de Factor Educación
+# Construcción de Factor Educación
 base_analisis <- base_analisis %>%
   mutate(
     nivel_educ = case_when(
@@ -63,14 +64,22 @@ base_analisis <- base_analisis %>%
     nivel_educ = relevel(factor(nivel_educ), ref = "ninguno")
   )
 
-#Experiencia potencial:
+# Experiencia potencial:
 base_analisis <- base_analisis %>%
   mutate(
     experiencia_pot = pmax(edad - ans_educ - 6, 0)
   )
 View(base_analisis)
 
+# Sacamos el número de página del link, para poder separar después los chunks
+# 1-7 (entrenamiento) de los chunks 8-10 (validación) que pide la Sección 3.
+base_analisis <- base_analisis %>%
+  mutate(chunk_num = as.integer(str_extract(chunk_origen, "(?<=page_)\\d+")))
+
+table(base_analisis$chunk_num)
+
 # Guardar en disco, para que 03_limpieza.R (o el siguiente script) cargue esto
 # directamente sin tener que repetir el scraping cada vez que se corra el pipeline.
 saveRDS(base_analisis, "base_analisis.rds")
+
 
