@@ -1,4 +1,8 @@
-
+#------------------------------------------------------------------------------#
+# 02_cleaning
+# Taller 1 - Big Data y Machine Learning
+# 2026-09-05
+#
 # Objetivos:
 #   Filtrar las personas con ingresos totales positivos, mayores de 18 años y que
 #   pertenecen a la categoría de ocupados
@@ -7,6 +11,7 @@
 # Outputs:
 #   `base_analisis.rds`, con la muestra filtrada y las variables renombradas,
 #   lista para las estadísticas descriptivas y el modelo de predicción.
+#------------------------------------------------------------------------------#
 
 install.packages("dplyr")
 library(dplyr)
