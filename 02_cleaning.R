@@ -20,14 +20,16 @@ muestra <- base_final %>%
 
 print(muestra)
 
-text_vars <- c('edad' = 'age', 'estrato_energia' = 'estrato1', 'tipo_ocupacion' = 'relab',
+text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1', 'tipo_ocupacion' = 'relab',
                'maximo_nivel_educativo' = 'maxEducLevel', 'ocupado' = 'ocu',
                'nivel_educativo_alto' = 'p6210', 'Grado_escolar_aprobado' = 'p6210s1',
                'actividad_ultima_semana' = 'p6240', 'cotizante' = 'p6920', 'pet' = 'pet',
-               'llave_hogar' = 'secuencia_p', 'horas_trabajadas' = 'totalHoursWorked')
+               'llave_hogar' = 'secuencia_p', 'horas_trabajadas' = 'totalHoursWorked',
+               'ingreso_total' = 'y_total_m')
 
 base_analisis <- muestra %>%
   select(all_of(text_vars))
+
 
 # Guardar en disco, para que 03_limpieza.R (o el siguiente script) cargue esto
 # directamente sin tener que repetir el scraping cada vez que se corra el pipeline.
