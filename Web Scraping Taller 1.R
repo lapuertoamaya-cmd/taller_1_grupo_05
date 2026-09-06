@@ -1,8 +1,9 @@
 #-----------------------------  Datos Taller 1 ---------------------------------
+
 #Librerias
 library(pacman)
 library(dplyr)
-
+library(writexl)
 p_load(
   tidyverse, # Manipulación de datos.
   rvest,     # Web scraping.
@@ -66,5 +67,9 @@ base_final <- map(Url_tablas, extraer_tabla_segura) %>%
 
 nrow(base_final)  
 View(base_final)
+
+#Exportar base de datos a excel
+write_xlsx(base_final, "GEIH2018.xlsx")
+
 
 

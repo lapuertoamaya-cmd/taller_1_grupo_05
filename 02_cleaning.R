@@ -30,6 +30,40 @@ text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1', '
 base_analisis <- muestra %>%
   select(all_of(text_vars))
 
+# Construcción de variables de interes
+base_analisis <- base_analisis %>%
+  mutate(
+    # Años continuos -, para el término cuantitativo de Mincer
+    ans_educ = case_when(
+      nivel_educativo_alto %in% c(1, 2) ~ 0,
+      nivel_educativo_alto %in% c(3, 4, 5) ~ Grado_escolar_aprobado,          # grado absoluto
+      nivel_educativo_alto == 6 ~ 11 + (Grado_escolar_aprobado / 2),           # en semestres
+      TRUE ~ NA_real_
+    )
+  )
+
+#Construcción de Factor Educación
+base_analisis <- base_analisis %>%
+  mutate(
+    nivel_educ = case_when(
+      maximo_nivel_educativo == 1 ~ "ninguno",
+      maximo_nivel_educativo == 2 ~ "preescolar",
+      maximo_nivel_educativo == 3 ~ "primaria_incompleta",
+      maximo_nivel_educativo == 4 ~ "primaria_completa",
+      maximo_nivel_educativo == 5 ~ "secundaria_incompleta",
+      maximo_nivel_educativo == 6 ~ "secundaria_completa",
+      maximo_nivel_educativo == 7 ~ "terciaria",
+      TRUE ~ NA_character_          # código 9 = N/A
+    ),
+    nivel_educ = relevel(factor(nivel_educ), ref = "ninguno")
+  )
+
+#Experiencia potencial:
+base_analisis <- base_analisis %>%
+  mutate(
+    experiencia_pot = pmax(edad - ans_educ - 6, 0)
+  )
+View(base_analisis)
 
 # Guardar en disco, para que 03_limpieza.R (o el siguiente script) cargue esto
 # directamente sin tener que repetir el scraping cada vez que se corra el pipeline.
