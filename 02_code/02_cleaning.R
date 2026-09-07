@@ -54,6 +54,11 @@ if (!require("tidyverse")) { # si no se puede cargar, require==FALSE
   library(tidyverse)
 }
 
+if (!require("readxl")) { # si no se puede cargar, require==FALSE
+  install.packages("readxl")
+  library(readxl)
+}
+
 # ------------------------------------------------------------------------------
 # (2) Restriccion de la muestra a mayores de edad, ocupados con ingresos positivos
 # ------------------------------------------------------------------------------
@@ -77,7 +82,7 @@ text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1',
                'tipo_ocupacion' = 'relab',
                'maximo_nivel_educativo' = 'maxEducLevel', 
                'ocupado' = 'ocu',
-               'nivel_educativo_alto' = 'p6210', 'Grado_escolar_aprobado' = 'p6210s1',
+               'nivel_educativo_alto' = 'p6210', 'grado_escolar_aprobado' = 'p6210s1',
                'actividad_ultima_semana' = 'p6240', 
                'cotizante' = 'p6920', 'pet' = 'pet',
                'llave_hogar' = 'secuencia_p', 'llave_persona'='orden', 'llave_vivienda'='directorio', 
@@ -89,21 +94,24 @@ text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1',
 base_analisis <- muestra %>%
   select(all_of(text_vars))
 
-# (3.2) Construcción de variables de interes
+# (3.2) construcción de variables de interes
+
 base_analisis <- base_analisis %>%
   mutate(
+    # (3.2.1) años de educacion
     # Años continuos -, para el término cuantitativo de Mincer
     ans_educ = case_when(
       nivel_educativo_alto %in% c(1, 2) ~ 0,
-      nivel_educativo_alto %in% c(3, 4, 5) ~ Grado_escolar_aprobado,          # grado absoluto
-      nivel_educativo_alto == 6 ~ 11 + (Grado_escolar_aprobado / 2),           # en semestres
+      nivel_educativo_alto ==3 ~ grado_escolar_aprobado,
+      nivel_educativo_alto == 4 & grado_escolar_aprobado == 0 ~ 5,
+      nivel_educativo_alto == 4 & grado_escolar_aprobado > 0 ~ grado_escolar_aprobado,
+      nivel_educativo_alto == 5 ~ grado_escolar_aprobado,
+      nivel_educativo_alto == 6 ~ 11 + (grado_escolar_aprobado / 2),
+      nivel_educativo_alto == 9 & grado_escolar_aprobado == 99 ~ NA_real_,
       TRUE ~ NA_real_
-    )
-  )
-
-# Construcción de Factor Educación
-base_analisis <- base_analisis %>%
-  mutate(
+    ),
+    
+    # (3.2.2) educacion como factor
     nivel_educ = case_when(
       maximo_nivel_educativo == 1 ~ "ninguno",
       maximo_nivel_educativo == 2 ~ "preescolar",
@@ -114,25 +122,18 @@ base_analisis <- base_analisis %>%
       maximo_nivel_educativo == 7 ~ "terciaria",
       TRUE ~ NA_character_          # código 9 = N/A
     ),
-    nivel_educ = relevel(factor(nivel_educ), ref = "ninguno")
+    nivel_educ = relevel(factor(nivel_educ), ref = "ninguno"),
+    
+    # (3.2.3) experiencia potencial
+    exp_potencial = pmax(edad - ans_educ - 6, 0)
   )
 
-# Experiencia potencial:
-base_analisis <- base_analisis %>%
-  mutate(
-    experiencia_pot = pmax(edad - ans_educ - 6, 0)
-  )
 View(base_analisis)
 
-# Sacamos el número de página del link, para poder separar después los chunks
-# 1-7 (entrenamiento) de los chunks 8-10 (validación) que pide la Sección 3.
-base_analisis <- base_analisis %>%
-  mutate(chunk_num = as.integer(str_extract(chunk_origen, "(?<=page_)\\d+")))
+# ------------------------------------------------------------------------------
+# (4) guardamos la base
+# ------------------------------------------------------------------------------
 
-table(base_analisis$chunk_num)
-
-# Guardar en disco, para que 03_limpieza.R (o el siguiente script) cargue esto
-# directamente sin tener que repetir el scraping cada vez que se corra el pipeline.
-saveRDS(base_analisis, "base_analisis.rds")
-
-
+# archivo en formato R
+saveRDS(base_analisis, "01_data/02_clean/base_analisis.rds")
+write_csv(base_analisis, "01_data/02_clean/base_analisis.csv")
