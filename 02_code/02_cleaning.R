@@ -9,7 +9,7 @@
 # Inputs:
 #   `base_final`, creada en `0.R`.
 # Outputs:
-#   `base_analisis.rds`, con la muestra filtrada y las variables renombradas,
+#   `base_analisis.rds` y .csv, con la muestra filtrada y las variables renombradas,
 #   lista para las estadísticas descriptivas y el modelo de predicción.
 #------------------------------------------------------------------------------#
 
@@ -125,7 +125,16 @@ base_analisis <- base_analisis %>%
     nivel_educ = relevel(factor(nivel_educ), ref = "ninguno"),
     
     # (3.2.3) experiencia potencial
-    exp_potencial = pmax(edad - ans_educ - 6, 0)
+    exp_potencial = pmax(edad - ans_educ - 6, 0),
+    
+    # (3.2.4) estrato como factor
+    estrato_factor = factor(estrato_energia),
+    
+    # (3.2.4) log del ingreso
+    ln_ingreso_total = log(ingreso_total),
+    
+    # (3.2.5) educacion con particion
+    edu_may_10 = ifelse(ans_educ>10,1,0)
   )
 
 View(base_analisis)
