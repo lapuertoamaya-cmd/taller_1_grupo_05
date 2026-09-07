@@ -13,11 +13,53 @@
 #   lista para las estadísticas descriptivas y el modelo de predicción.
 #------------------------------------------------------------------------------#
 
-install.packages("dplyr")
-library(dplyr)
-library(tidyverse)
 
-# 1. Restringir la muestra
+# ------------------------------------------------------------------------------
+# (0) Declarar rutas del proyecto desde la ubicacion del script
+# ------------------------------------------------------------------------------
+
+# (0.0) paquete rstudioapi
+if (!require("pacman")) { # si no se puede cargar, require==FALSE
+  install.packages("pacman")
+  library(pacman)
+}
+
+p_load(rstudioapi)
+library(rstudioapi)
+
+# (0.1) Obtener la ruta completa del script actual
+ruta_script <- rstudioapi::getActiveDocumentContext()$path
+
+# (0.2) Obtener la carpeta donde esta este script
+dir_codigo <- dirname(ruta_script)
+
+# (0.3) Definir el root del proyecto como la carpeta anterior a 02_code
+root <- normalizePath(file.path(dir_codigo, ".."), winslash = "/", mustWork = TRUE)
+
+# (0.4) Definir ruta del proyecto
+setwd(root)
+
+# (0.5) Carpetas principales del proyecto
+# "01_data"
+# "02_code"
+# "03_outputs"
+
+
+# ------------------------------------------------------------------------------
+# (1) importar paquetes necesarios
+# ------------------------------------------------------------------------------
+
+if (!require("tidyverse")) { # si no se puede cargar, require==FALSE
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+
+# ------------------------------------------------------------------------------
+# (2) Restriccion de la muestra a mayores de edad, ocupados con ingresos positivos
+# ------------------------------------------------------------------------------
+
+base_final <- read_excel("01_data/01_raw/geih2018_sample.xlsx")
+
 muestra <- base_final %>%
   filter(
     age >= 18,
@@ -26,17 +68,28 @@ muestra <- base_final %>%
 
 print(muestra)
 
-text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1', 'tipo_ocupacion' = 'relab',
-               'maximo_nivel_educativo' = 'maxEducLevel', 'ocupado' = 'ocu',
+# ------------------------------------------------------------------------------
+# (3) Limpieza de variables
+# ------------------------------------------------------------------------------
+
+# (3.1) vector de vars relevantes
+text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1', 
+               'tipo_ocupacion' = 'relab',
+               'maximo_nivel_educativo' = 'maxEducLevel', 
+               'ocupado' = 'ocu',
                'nivel_educativo_alto' = 'p6210', 'Grado_escolar_aprobado' = 'p6210s1',
-               'actividad_ultima_semana' = 'p6240', 'cotizante' = 'p6920', 'pet' = 'pet',
-               'llave_hogar' = 'secuencia_p', 'horas_trabajadas' = 'totalHoursWorked',
-               'ingreso_total' = 'y_total_m',  'chunk_origen' = 'url_origen')
+               'actividad_ultima_semana' = 'p6240', 
+               'cotizante' = 'p6920', 'pet' = 'pet',
+               'llave_hogar' = 'secuencia_p', 'llave_persona'='orden', 'llave_vivienda'='directorio', 
+               'horas_trabajadas' = 'totalHoursWorked',
+               'ingreso_total' = 'y_total_m', 
+               'tamanio_firma'='sizeFirm', 'informal'='informal',
+               'chunk'='chunk', 'chunk_origen' = 'url_origen')
 
 base_analisis <- muestra %>%
   select(all_of(text_vars))
 
-# Construcción de variables de interes
+# (3.2) Construcción de variables de interes
 base_analisis <- base_analisis %>%
   mutate(
     # Años continuos -, para el término cuantitativo de Mincer
