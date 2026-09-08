@@ -167,7 +167,6 @@ write_xlsx(
 
 
 
-
 # ------------------------------------------------------------------------------
 # (4) estructura de correlaciones entre las variables seleccionadas
 # ------------------------------------------------------------------------------
@@ -281,6 +280,8 @@ m1.1 <- lm(, data=t)
 
 # (5.2) modelo de edad condicional
 m1.2 <-
+
+modelo_incondicional <- lm(log(ingreso_total) ~ edad + I(edad^2), data = base_analisis)
 
 # (5.3) modelo genero incondicional
 m2.1 <-
