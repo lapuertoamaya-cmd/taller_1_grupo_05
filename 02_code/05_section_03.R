@@ -167,7 +167,6 @@ write_xlsx(
 
 
 
-
 # ------------------------------------------------------------------------------
 # (4) estructura de correlaciones entre las variables seleccionadas
 # ------------------------------------------------------------------------------
@@ -266,6 +265,7 @@ ggsave("03_outputs/03.7_corr_horas_trabajadas.png", plot=horas)
 
 # (5.1) modelo de edad incondicional
 
+modelo_incondicional <- lm(log(ingreso_total) ~ edad + I(edad^2), data = base_analisis)
 
 # (5.4) modelo de genero condicional
 
