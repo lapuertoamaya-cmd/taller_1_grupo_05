@@ -113,13 +113,12 @@ base_analisis <- base_analisis %>%
     
     # (3.2.2) educacion como factor
     nivel_educ = case_when(
-      maximo_nivel_educativo == 1 ~ "ninguno",
-      maximo_nivel_educativo == 2 ~ "preescolar",
-      maximo_nivel_educativo == 3 ~ "primaria_incompleta",
-      maximo_nivel_educativo == 4 ~ "primaria_completa",
-      maximo_nivel_educativo == 5 ~ "secundaria_incompleta",
-      maximo_nivel_educativo == 6 ~ "secundaria_completa",
-      maximo_nivel_educativo == 7 ~ "terciaria",
+      nivel_educativo_alto == 1 ~ "ninguno",
+      nivel_educativo_alto == 2 ~ "preescolar",
+      nivel_educativo_alto == 3 ~ "primaria",
+      nivel_educativo_alto == 4 ~ "secundaria",
+      nivel_educativo_alto == 5 ~ "media",
+      nivel_educativo_alto == 6 ~ "terciaria",
       TRUE ~ NA_character_          # código 9 = N/A
     ),
     nivel_educ = relevel(factor(nivel_educ), ref = "ninguno"),
@@ -130,11 +129,14 @@ base_analisis <- base_analisis %>%
     # (3.2.4) estrato como factor
     estrato_factor = factor(estrato_energia),
     
-    # (3.2.4) log del ingreso
+    # (3.2.5) log del ingreso
     ln_ingreso_total = log(ingreso_total),
     
-    # (3.2.5) educacion con particion
-    edu_may_10 = ifelse(ans_educ>10,1,0)
+    # (3.2.6) educacion con particion
+    edu_may_10 = ifelse(ans_educ>10,1,0),
+    
+    # (3.2.7) ocupacion como factor
+    tipo_ocupacion = factor(tipo_ocupacion)
   )
 
 View(base_analisis)
