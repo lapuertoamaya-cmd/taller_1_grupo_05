@@ -12,10 +12,83 @@ library(dplyr)
 library(tidyverse)
 library(boot)
 library(stargazer)
+library(dplyr)
+library(tidyr)
+library(purrr)
 
-#Recodificando la variable sexo donde 1: mujer y 0: Hombre
-base_analisis <- base_analisis %>%
-  mutate(sexo = 1 - sexo)
+#Estadisticas Descriptivas------------------------------------------------------
+base_analisis <- base_analisis %>% mutate(log_ingreso = log(ingreso_total))
+continuous_vars <- c("log_ingreso", "ans_educ", "edad", "experiencia_pot")
+discrete_vars   <- c("sexo", "nivel_educ", "estrato_energia")
+
+# --- Función para estadísticas continuas ---
+stats_continuas <- function(df, vars) {
+  map_dfr(vars, function(v) {
+    x <- df[[v]]
+    tibble(
+      variable = v,
+      media    = mean(x, na.rm = TRUE),
+      de       = sd(x, na.rm = TRUE),
+      min      = min(x, na.rm = TRUE),
+      p10      = quantile(x, 0.10, na.rm = TRUE),
+      mediana  = median(x, na.rm = TRUE),
+      p90      = quantile(x, 0.90, na.rm = TRUE),
+      max      = max(x, na.rm = TRUE)
+    )
+  })
+}
+
+# --- Función para estadísticas discretas/dummies ---
+stats_discretas <- function(df, vars, var_salario = "log_ingreso") {
+  n_total <- nrow(df)
+  map_dfr(vars, function(v) {
+    df %>%
+      group_by(categoria = as.character(.data[[v]])) %>%
+      summarise(
+        N                     = n(),
+        promedio_log_salario  = mean(.data[[var_salario]], na.rm = TRUE),
+        de_log_salario        = sd(.data[[var_salario]], na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        variable   = v,
+        porcentaje = 100 * N / n_total
+      ) %>%
+      select(variable, categoria, N, porcentaje, promedio_log_salario, de_log_salario)
+  })
+}
+
+# --- Subconjuntos (ajusta los valores según cómo esté codificado 'sexo') ---
+base_hombres <- base_analisis %>% filter(sexo == 0)
+base_mujeres <- base_analisis %>% filter(sexo == 1)
+
+# --- Tabla de continuas ---
+tabla_continuas <- bind_rows(
+  stats_continuas(base_analisis, continuous_vars) %>% mutate(grupo = "Total"),
+  stats_continuas(base_hombres,  continuous_vars) %>% mutate(grupo = "Hombres"),
+  stats_continuas(base_mujeres,  continuous_vars) %>% mutate(grupo = "Mujeres")
+) %>%
+  pivot_longer(cols = media:max, names_to = "estadistico", values_to = "valor") %>%
+  pivot_wider(names_from = grupo, values_from = valor) %>%
+  arrange(variable, factor(estadistico, levels = c("media","de","min","p10","mediana","p90","max")))
+
+# --- Tabla de discretas ---
+tabla_discretas <- bind_rows(
+  stats_discretas(base_analisis, discrete_vars) %>% mutate(grupo = "Total"),
+  stats_discretas(base_hombres,  discrete_vars) %>% mutate(grupo = "Hombres"),
+  stats_discretas(base_mujeres,  discrete_vars) %>% mutate(grupo = "Mujeres")
+) %>%
+  pivot_longer(cols = c(N, porcentaje, promedio_log_salario, de_log_salario),
+               names_to = "estadistico", values_to = "valor") %>%
+  pivot_wider(names_from = grupo, values_from = valor) %>%
+  arrange(variable, categoria,
+          factor(estadistico, levels = c("N","porcentaje","promedio_log_salario","de_log_salario")))
+
+#Tabla variables continuas
+stargazer(as.data.frame(tabla_continuas), type = "text", summary = FALSE, rownames = FALSE)
+
+#Tabla variables discretas
+stargazer(as.data.frame(tabla_discretas), type = "text", summary = FALSE, rownames = FALSE)
 
 #Modelo uncicamente con brecha de genero
 #Modelo brecha de genero--------------------------------------------------------
@@ -63,7 +136,7 @@ calcular_model_incond_boot <- function(data, indices) {
   # 2. Estimar el mismo modelo en la muestra bootstrap
   modelo_boot <- lm(
     log(ingreso_total) ~ sexo,
-    data = base_analisis
+    data = muestra_boot
   )
   
   # 3. Extraer el coeficiente de sexo
@@ -75,7 +148,7 @@ calcular_model_incond_boot <- function(data, indices) {
 
 set.seed(123) #semilla
 
-boot_Sexo <- boot(
+boot_sexo <- boot(
   data = base_analisis,
   statistic = calcular_model_incond_boot,
   R = 1000
@@ -93,16 +166,41 @@ bias_boot_sexo <- mean(boot_gap$t) - boot_gap$t0
 # Error estándar bootstrap
 se_boot_sexo <- sd(boot_gap$t)
 
+#Intervalos de confianza bootstrap
+IC_boot_sexo <- boot.ci(
+  boot_sexo,
+  type = "perc"
+)
+IC_boot_sexo
+
+#Transformacion de los intervalos boot
+limite_inferior <- IC_boot_sexo$percent[4]
+limite_superior <- IC_boot_sexo$percent[5]
+ 
+Transformación_IC_inferior <- ((exp(limite_inferior) - 1) * 100)
+Transformación_IC_superior <- ((exp(limite_superior) - 1) * 100)
+
+Transformación_IC_inferior
+Transformación_IC_superior
 
 #Interpretación ----------------------------------------------------------------
 # Resultado porcentual 
 Transformación_Beta <- ((exp(coef(Modelo_brecha)["sexo"]) - 1) * 100)
 Transformación_Beta
 
-#Interpretación
+#Interpretación del Coeficiente
 #En promedio, el salario de las mujeres es 21,71% mas bajo en comparación a los 
 #hombres. Tenemos una confianza del 95% de que el efecto poblacional de la 
 #discriminación salarial estara entre (-0,267, -0,209).
+
+#Interpretación IC bootstrap
+#El intervalo de confianza bootstrap ajustado al 95% indica que el efecto 
+#poblacional de la variable sexo sobre el ingreso mensual se encuentra entre
+#−23,34% y −18,93%.
+
+#En otras palabras, con un nivel de confianza del 95%, se estima que la brecha 
+#salarial asociada al sexo se encuentra entre 18,93% y 23,34% en menor ingreso
+#para las mujeres respecto de los hombres.
 
 #Modelo de genero con controles-------------------------------------------------
 modelo_gap_controles <- lm(
@@ -111,7 +209,7 @@ modelo_gap_controles <- lm(
   data = base_analisis
 )
 
-#Resultados---------------------------------------------------------------------
+#Resultados modelo controles----------------------------------------------------
 stargazer(
   modelo_gap_controles,
   type = "text",
@@ -182,6 +280,43 @@ bias_boot_gap <- mean(boot_gap$t) - boot_gap$t0
 
 # Error estándar bootstrap
 se_boot_gap <- sd(boot_gap$t)
+
+#Intervalos de confianza bootstrap
+IC_boot_gap <- boot.ci(
+  boot_gap,
+  type = "perc"
+)
+IC_boot_gap
+
+#Interpretación ----------------------------------------------------------------
+# Resultado porcentual 
+Transformación_Beta_gap <- ((exp(coef(modelo_gap_controles)["sexo"]) - 1) * 100)
+Transformación_Beta_gap
+
+#Transformacion de los intervalos boot
+limite_inferior <- IC_boot_gap$percent[4]
+limite_superior <- IC_boot_gap$percent[5]
+
+Transformación_IC_inferior_gap <- ((exp(limite_inferior) - 1) * 100)
+Transformación_IC_superior_gap <- ((exp(limite_superior) - 1) * 100)
+
+Transformación_IC_inferior_gap
+Transformación_IC_superior_gap
+
+#Interpretación del coeficiente 
+#En promedio, el salario de las mujeres, es 26,48% mas bajo en comparación a los 
+#hombres cuando se controla por nivel educativo, estrato de energia y experiencia
+#potencial. Tenemos una confianza del 95% de que el efecto poblacional de la 
+#discriminación salarial estara entre (-0,330, -0,285).
+
+#Interpretación IC bootstrap
+#El intervalo de confianza bootstrap ajustado al 95% indica que el efecto 
+#poblacional de la variable sexo sobre el ingreso mensual se encuentra entre
+#−28,22% y −24,76%.
+
+#En otras palabras, con un nivel de confianza del 95%, se estima que la brecha 
+#salarial asociada al sexo se encuentra entre 24,76% y 28,22% en menor ingreso
+#para las mujeres respecto de los hombres.
 
 
 # 2. Frisch-Waugh-Lovell -------------------------------------------------------
@@ -258,6 +393,9 @@ coef(modelo_gap_controles)["sexo"]
 coef(fwl_sex)["res_sex"]
 beta_fwl <- coef(fwl_sex)["res_sex"]
 
+#Error estandar del modelo
+summary(fwl_sex)$coefficients["res_sex", "Std. Error"]
+
 #Error estandar analitico FWL --------------------------------------------------
 #El SE que da R por defecto NO es correcto: usa grados de libertad de una regresión
 #de 2 parámetros (n-2), en vez de los grados de libertad reales del modelo completo 
@@ -268,6 +406,7 @@ df <- n_model - k #Grados de libertad
 sigma2 <- sum(residuals(modelo_gap_controles)^2) / df 
 se_analitico <- sqrt(sigma2 / sum(res_sex^2))
 se_analitico
+
 
 #Bootstrap----------------------------------------------------------------------
 FWL_boot <- function(data, indices) {
@@ -338,4 +477,11 @@ bias_boot_FWL
 # Error estándar bootstrap
 se_boot_FWL <- sd(boot_FWL$t)
 se_boot_FWL
+
+#Intervalos de confianza bootstrap
+IC_boot_gap_FWL <- boot.ci(
+  boot_FWL,
+  type = "perc"
+)
+IC_boot_gap_FWL
 
