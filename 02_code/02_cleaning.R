@@ -72,6 +72,7 @@ text_vars <- c('edad' = 'age', 'hombre' = 'sex', 'estrato_energia' = 'estrato1',
                'tipo_ocupacion' = 'relab',
                'maximo_nivel_educativo' = 'maxEducLevel', 
                'ocupado' = 'ocu',
+               'cuenta_propia' = 'cuentaPropia',
                'nivel_educativo_alto' = 'p6210', 'grado_escolar_aprobado' = 'p6210s1',
                'actividad_ultima_semana' = 'p6240', 
                'cotizante' = 'p6920', 'pet' = 'pet',
@@ -83,6 +84,8 @@ text_vars <- c('edad' = 'age', 'hombre' = 'sex', 'estrato_energia' = 'estrato1',
 
 base_analisis <- muestra %>%
   select(all_of(text_vars))
+
+rm(muestra, base_final)
 
 # (3.2) construcción de variables de interes
 
@@ -111,7 +114,7 @@ base_analisis <- base_analisis %>%
       nivel_educativo_alto == 6 ~ "terciaria",
       TRUE ~ NA_character_          # código 9 = N/A
     ),
-    nivel_educ = relevel(factor(nivel_educ), ref = "ninguno"),
+    nivel_educ = relevel(factor(nivel_educ), ref = "primaria"),
     
     # (3.2.3) experiencia potencial
     exp_potencial = pmax(edad - ans_educ - 6, 0),
@@ -123,7 +126,7 @@ base_analisis <- base_analisis %>%
     ln_ingreso_total = log(ingreso_total),
     
     # (3.2.6) educacion con particion
-    edu_may_10 = ifelse(ans_educ>10,1,0),
+    edu_sup = ifelse(nivel_educativo_alto==6,1,0),
     
     # (3.2.7) ocupacion como factor
     tipo_ocupacion = factor(tipo_ocupacion),
@@ -141,3 +144,4 @@ View(base_analisis)
 # archivo en formato R
 saveRDS(base_analisis, "01_data/02_clean/base_analisis.rds")
 write_csv(base_analisis, "01_data/02_clean/base_analisis.csv")
+
