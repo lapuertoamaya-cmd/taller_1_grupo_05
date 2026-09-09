@@ -37,8 +37,7 @@ if (!require("pacman")) { # si no se puede cargar, require==FALSE
   library(pacman)
 }
 
-p_load(rstudioapi)
-library(rstudioapi)
+p_load(rstudioapi, write_xl)
 
 
 # (0.1) Obtener la ruta completa del script actual

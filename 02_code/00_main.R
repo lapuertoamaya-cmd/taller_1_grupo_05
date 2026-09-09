@@ -44,9 +44,8 @@
   # ------------------------------------------------------------------------------
   
   scripts <- c(
-    "02_code/01_scrapping_geih2018_sample",
-    "02_code/02_limpieza_datos.R",
-    "02_code/03_analisis_descriptivo.R",
+    "02_code/01_scrapping_geih2018_sample.R",
+    "02_code/02_cleaning.R",
     "02_code/05_seccion_1.R",
     "02_code/06_seccion_2.R",
     "02_code/07_seccion_3.R"
