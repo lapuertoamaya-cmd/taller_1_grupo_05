@@ -1,0 +1,365 @@
+# Seccion 01
+
+# Objetivo:
+#   Estimar el perfil edad-ingreso incondicional y condicional, calcular la edad
+#   pico implicada por cada especificación con su intervalo de confianza (bootstrap),
+#   y comparar ambos modelos.
+
+# Inputs:
+#   `base_analisis`, creada en el script de limpieza (02_cleaning.R).
+
+# Outputs:
+#   `modelo_incondicional`, `modelo_condicional`: objetos de regresión.
+#   `tabla_comparacion`: tabla resumen para la presentación.
+#    Gráfico de los dos perfiles edad-ingreso.
+
+library(tidyverse)
+library(boot)
+library(MASS)
+library(writexl)
+library(conflicted)
+conflict_prefer(name = "select", winner = "dplyr")
+conflict_prefer(name = "filter", winner = "dplyr")
+
+# ------------------------------------------------------------------------------
+# Declarar rutas del proyecto desde la ubicacion del script
+# ------------------------------------------------------------------------------
+
+# (0.1) Obtener la ruta completa del script actual
+ruta_script <- rstudioapi::getActiveDocumentContext()$path
+
+# (0.2) Obtener la carpeta donde esta este script
+dir_codigo <- dirname(ruta_script)
+
+# (0.3) Definir el root del proyecto como la carpeta anterior a 02_code
+root <- normalizePath(file.path(dir_codigo, ".."), winslash = "/", mustWork = TRUE)
+
+# (0.4) Definir ruta del proyecto
+setwd(root)
+
+# (0.5) Carpetas principales del proyecto
+# "01_data"
+# "02_code"
+# "03_outputs"
+
+# ---------------------------------------------------------------
+# 0. Variables descriptivas
+# ---------------------------------------------------------------
+
+# 0.1 Variables continuas
+vars_desc <- c("ingreso_total", "edad", "horas_trabajadas")
+
+descr_grales <- base_analisis |>
+  select(all_of(vars_desc)) |>
+  summarise(
+    across(
+      everything(),
+      list(
+        N = ~ sum(!is.na(.x)),
+        media = ~ mean(.x, na.rm = TRUE),
+        sd = ~ sd(.x, na.rm = TRUE),
+        mediana = ~ median(.x, na.rm = TRUE),
+        p25 = ~ quantile(.x, 0.25, na.rm = TRUE),
+        p75 = ~ quantile(.x, 0.75, na.rm = TRUE),
+        min = ~ min(.x, na.rm = TRUE),
+        max = ~ max(.x, na.rm = TRUE)
+      )
+    )
+  ) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = c("variable", ".value"),
+    names_pattern = "^(.*)_(N|media|sd|mediana|p25|p75|min|max)$"
+  ) |>
+  mutate(
+    variable = factor(variable, levels = vars_desc)
+  ) |>
+  arrange(variable) |>
+  mutate(
+    variable = as.character(variable)
+  )
+
+descr_grales
+
+# 0.2 Variable categórica: Etiquetas según el diccionario oficial de la GEIH
+descr_ocupacion <- base_analisis |>
+  mutate(
+    tipo_ocupacion_label = case_when(
+      tipo_ocupacion == 1 ~ "Obrero o empleado de empresa particular",
+      tipo_ocupacion == 2 ~ "Obrero o empleado del gobierno",
+      tipo_ocupacion == 3 ~ "Empleado doméstico",
+      tipo_ocupacion == 4 ~ "Trabajador por cuenta propia",
+      tipo_ocupacion == 5 ~ "Patrón o empleador",
+      tipo_ocupacion == 6 ~ "Trabajador familiar sin remuneracion",
+      tipo_ocupacion == 7 ~ "Trabajador sin remuneracin en empresas o negocios de otros hogares",
+      tipo_ocupacion == 8 ~ "Jornalero o peón",
+      tipo_ocupacion == 9 ~ "Otro",
+      TRUE ~ as.character(tipo_ocupacion)
+    )
+  ) |>
+  group_by(tipo_ocupacion_label) |>
+  summarise(
+    N = n(),
+    promedio_ingreso = mean(ingreso_total, na.rm = TRUE),
+    sd_ingreso = sd(ingreso_total, na.rm = TRUE)
+  ) |>
+  mutate(pct = N / sum(N) * 100) |>
+  arrange(desc(N))
+
+descr_ocupacion
+
+# 0.3 Exportar ambas tablas al mismo Excel, en hojas separadas
+write_xlsx(
+  list(
+    continuas = descr_grales,
+    ocupacion = descr_ocupacion
+  ),
+  path = file.path(root, "03_outputs", "01.1_tabla_descriptivas.xlsx")
+)
+
+# ---------------------------------------------------------------
+# 1. Modelo incondicional: log(w) = β1 + β2*Age + β3*Age^2 + u
+# ---------------------------------------------------------------
+
+# Modeo 0.1:
+modelo_incondicional <- lm(log(ingreso_total) ~ edad + I(edad^2), data = base_analisis)
+
+# Estimamos el modelo, creando la variable al cuadrado por fuera
+base_analisis <- base_analisis %>%
+  mutate(edad2 = edad^2)
+
+modelo_alternativo <- lm(log(ingreso_total) ~ edad + edad2, data = base_analisis)
+
+# Comparamos los resultados, los coeficientes deberían ser idénticos
+coef(modelo_incondicional)
+coef(modelo_alternativo)
+
+# Edad pico implicada: -β2 / (2*β3) 
+coefs_incond <- coef(modelo_incondicional)
+edad_pico_incond <- -coefs_incond["edad"] / (2 * coefs_incond["I(edad^2)"])
+edad_pico_incond
+
+# ---------------------------------------------------------------
+# 2. Diagnóstico de apalancamiento
+# ---------------------------------------------------------------
+
+# ---------------------------------------------------------------
+# 2.1 Diagnóstico de leverage, outliers y observaciones influyentes
+# ---------------------------------------------------------------
+
+# 0.1 Leverage: qué tan alejada está cada persona del resto en la variable
+#    explicativa (edad). Un leverage alto es solo "potencial" de influencia,
+#    no significa que la observación realmente mueva los coeficientes.
+
+base_analisis <- base_analisis %>%
+  mutate(num_leverage = hatvalues(modelo_incondicional))
+
+num_meanLeverage <- mean(base_analisis$num_leverage)
+num_cutoff <- 3 * num_meanLeverage
+num_cutoff
+
+altos_leverage <- which(base_analisis$num_leverage > num_cutoff)
+# Vemos el numero de datos atipicos
+length(altos_leverage)
+
+# Revisamos estos valores en detalle
+base_analisis %>%
+  slice(altos_leverage) %>%
+  summarise(
+    edad_min = min(edad),
+    edad_max = max(edad),
+    edad_promedio = mean(edad)
+  )
+
+# Histograma rápido para verlo visualmente
+hist(base_analisis$edad[altos_leverage], main = "Edad de las observaciones con leverage alto",
+     xlab = "Edad")
+
+# 0.2. Outliers: residuales estudentizados, no residuales crudos, porque los
+#    crudos no son comparables entre sí (su varianza depende del leverage).
+
+base_analisis <- base_analisis %>%
+  mutate(num_studresid = studres(modelo_incondicional))
+
+ggplot(data = base_analisis, mapping = aes(x = num_studresid)) +
+  geom_vline(xintercept = c(-3, 3), linetype = "dashed", color = "#D55E00") +
+  geom_density() +
+  labs(x = "Studentized residual",
+       y = "Density",
+       caption = "Note. Dashed lines mark the illustrative values -3 and 3.") +
+  theme_classic()
+
+
+# 0.3 Distancia de Cook: combina leverage y residual en un solo número.
+#    Una observación solo es realmente influyente si tiene AMBAS cosas:
+#    posición atípica (leverage alto) Y el modelo la predice mal (residual grande).
+
+base_analisis <- base_analisis %>%
+  mutate(num_cooksD = cooks.distance(modelo_incondicional))
+
+plot(modelo_incondicional, which = 4)
+
+# Observamos esas observaciones
+base_analisis %>%
+  slice(c(823, 6335, 8903)) %>%
+  dplyr::select(edad, ingreso_total, num_leverage, num_studresid, num_cooksD)
+
+# 4. Observaciones influyentes: cruce de las dos condiciones (no solo una)
+influyentes <- which(base_analisis$num_leverage > num_cutoff &
+                       abs(base_analisis$num_studresid) > 3)
+length(influyentes)
+
+# 5. Análisis de sensibilidad: comparamos los coeficientes CON y SIN esas
+#    observaciones. No se eliminan de forma permanente, esto
+#    es solo para ver si el resultado (la edad pico) es sensible a ellas.
+
+base_analisis_filtrada <- base_analisis %>%
+  filter(!row_number() %in% influyentes)
+
+modelo_sin_influyentes <- lm(log(ingreso_total) ~ edad + I(edad^2),
+                             data = base_analisis_filtrada)
+
+coefs_filtrado <- coef(modelo_sin_influyentes)
+edad_pico_filtrado <- -coefs_filtrado["edad"] / (2 * coefs_filtrado["I(edad^2)"])
+
+cat("Edad pico (muestra completa):", edad_pico_incond, "\n")
+cat("Edad pico (sin observaciones influyentes):", edad_pico_filtrado, "\n")
+
+# Vemos una diferencia minima por lo que nuestros resultados son robustos
+
+# ---------------------------------------------------------------
+# 3. Bootstrap para el intervalo de confianza de la edad pico (modelo incondicional)
+# ---------------------------------------------------------------
+
+# 0.1.Bootstrap para el IC de la edad pico: no es un solo coeficiente, es una
+#    combinación de dos (-beta_edad/2*beta_edad2), por eso no basta el SE
+#    que da lm() directamente.
+
+calcular_edad_pico <- function(data, indices) {
+  # remuestreo con reemplazo, tamaño n
+  muestra_boot <- data[indices, ]
+  modelo_boot <- lm(log(ingreso_total) ~ edad + I(edad^2), data = muestra_boot)
+  coefs_boot <- coef(modelo_boot)
+  # edad pico de esta repetición
+  -coefs_boot["edad"] / (2 * coefs_boot["I(edad^2)"])
+}
+
+# 1000 repeticiones
+set.seed(1112)
+boot_incond <- boot(data = base_analisis, statistic = calcular_edad_pico, R = 1000)
+
+# Edad pico con la muestra completa
+boot_incond$t0
+# Bias
+mean(boot_incond$t) - boot_incond$t0
+# Error estándar bootstrap
+sd(boot_incond$t)
+
+# 0.2.Intervalo de confianza (método percentil): percentiles 2.5% y 97.5%
+#    de las 1000 repeticiones.
+ic_edad_pico_incond <- boot.ci(boot_incond, type = "perc")
+ic_edad_pico_incond
+
+head(boot_incond$t)
+# Comprobamos y deben ser 1000 valores
+length(boot_incond$t)
+
+# ---------------------------------------------------------------
+# 4. Modelo condicional: agregando horas trabajadas y tipo de ocupación
+# ---------------------------------------------------------------
+modelo_condicional <- lm(log(ingreso_total) ~ edad + I(edad^2) + horas_trabajadas + factor(tipo_ocupacion),
+                         data = base_analisis)
+summary(modelo_condicional)
+
+coefs_cond <- coef(modelo_condicional)
+edad_pico_cond <- -coefs_cond["edad"] / (2 * coefs_cond["I(edad^2)"])
+edad_pico_cond
+
+# Bootstrap para el intervalo de confianza de la edad pico (modelo condicional)
+calcular_edad_pico_cond <- function(data, indices) {
+  muestra_boot <- data[indices, ]
+  modelo_boot <- lm(log(ingreso_total) ~ edad + I(edad^2) + horas_trabajadas + factor(tipo_ocupacion),
+                    data = muestra_boot)
+  coefs_boot <- coef(modelo_boot)
+  -coefs_boot["edad"] / (2 * coefs_boot["I(edad^2)"])
+}
+
+set.seed(1112)
+boot_cond <- boot(data = base_analisis, statistic = calcular_edad_pico_cond, R = 1000)
+ic_edad_pico_cond <- boot.ci(boot_cond, type = "perc")
+ic_edad_pico_cond
+
+
+# ---------------------------------------------------------------
+# 5. Tabla comparativa de ambas especificaciones
+# ---------------------------------------------------------------
+tabla_comparacion <- tibble(
+  especificacion = c("Incondicional", "Condicional"),
+  edad_pico       = c(edad_pico_incond, edad_pico_cond),
+  ic_inferior     = c(ic_edad_pico_incond$percent[4], ic_edad_pico_cond$percent[4]),
+  ic_superior     = c(ic_edad_pico_incond$percent[5], ic_edad_pico_cond$percent[5]),
+  r_cuadrado      = c(summary(modelo_incondicional)$r.squared, summary(modelo_condicional)$r.squared)
+)
+
+tabla_comparacion
+
+# ---------------------------------------------------------------
+# Gráfico estilo "perfil edad-ingreso" con banda de confianza al 95%
+# y edad pico marcada (bootstrap)
+# ---------------------------------------------------------------
+
+# 1. Rango de edad para predecir
+rango_edad <- tibble(edad = seq(min(base_analisis$edad), max(base_analisis$edad), by = 1))
+
+# 2. Predicción con intervalo de confianza (en escala log, la escala del modelo)
+pred <- predict(modelo_incondicional, newdata = rango_edad, interval = "confidence")
+
+rango_edad <- rango_edad %>%
+  mutate(
+    pred_log = pred[, "fit"],
+    lwr_log  = pred[, "lwr"],
+    upr_log  = pred[, "upr"],
+    # Volvemos a la escala original (pesos), exponenciando
+    pred_nivel = exp(pred_log),
+    lwr_nivel  = exp(lwr_log),
+    upr_nivel  = exp(upr_log)
+  )
+
+# 3. Punto de la edad pico, usando el resultado del bootstrap
+edad_pico_valor <- edad_pico_incond  # o edad_pico, según cómo lo llamaste
+ingreso_pico <- exp(predict(modelo_incondicional,
+                            newdata = tibble(edad = edad_pico_valor)))
+
+ggplot(rango_edad, aes(x = edad)) +
+  geom_ribbon(aes(ymin = lwr_nivel, ymax = upr_nivel), fill = "gray85") +
+  geom_line(aes(y = pred_nivel, color = "Ingreso predicho"), linewidth = 1) +
+  geom_line(aes(y = lwr_nivel, color = "Límite inferior"), linetype = "dashed") +
+  geom_line(aes(y = upr_nivel, color = "Límite superior"), linetype = "dashed") +
+  annotate("segment", x = edad_pico_valor, xend = edad_pico_valor,
+           y = 0, yend = ingreso_pico,
+           color = "#C51B8A", linetype = "dashed") +
+  geom_point(data = tibble(edad = edad_pico_valor, y = ingreso_pico),
+             aes(x = edad, y = y, color = "Edad pico"), size = 3) +
+  annotate("text", x = edad_pico_valor, y = ingreso_pico * 1.05,
+           label = round(edad_pico_valor, 1), fontface = "italic") +
+  scale_color_manual(
+    name = NULL,
+    values = c("Edad pico" = "#C51B8A", "Ingreso predicho" = "#08306B",
+               "Límite inferior" = "#6A51A3", "Límite superior" = "#6A51A3"),
+    breaks = c("Edad pico", "Ingreso predicho", "Límite inferior", "Límite superior")
+  ) +
+  scale_y_continuous(labels = scales::comma_format(big.mark = ".", decimal.mark = ",")) +
+  labs(
+    x = "Edad",
+    y = "Ingreso mensual predicho (COP)",
+    caption = "Nota: la figura muestra los valores predichos de ingreso laboral para cada\nedad con su intervalo de confianza al 95%, y la edad pico obtenida mediante bootstrap."
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(),
+    plot.caption = element_text(hjust = 0, size = 9)
+  )
+
+ggsave("perfil_edad_ingreso.png", width = 8, height = 5, dpi = 300)
+
