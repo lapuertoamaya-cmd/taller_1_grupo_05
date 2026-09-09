@@ -304,62 +304,65 @@ tabla_comparacion <- tibble(
 tabla_comparacion
 
 # ---------------------------------------------------------------
-# Gráfico estilo "perfil edad-ingreso" con banda de confianza al 95%
-# y edad pico marcada (bootstrap)
+# 7. Gráfico 
 # ---------------------------------------------------------------
 
-# 1. Rango de edad para predecir
-rango_edad <- tibble(edad = seq(min(base_analisis$edad), max(base_analisis$edad), by = 1))
+# 0.1. Rango de edad para ambos modelos
+rango_edad2 <- tibble(edad = seq(min(base_analisis$edad), max(base_analisis$edad), by = 1))
 
-# 2. Predicción con intervalo de confianza (en escala log, la escala del modelo)
-pred <- predict(modelo_incondicional, newdata = rango_edad, interval = "confidence")
-
-rango_edad <- rango_edad %>%
+# 0.2. Predicciones de nivel (sin intervalo de confianza), exponenciando a pesos
+rango_edad2 <- rango_edad2 %>%
   mutate(
-    pred_log = pred[, "fit"],
-    lwr_log  = pred[, "lwr"],
-    upr_log  = pred[, "upr"],
-    # Volvemos a la escala original (pesos), exponenciando
-    pred_nivel = exp(pred_log),
-    lwr_nivel  = exp(lwr_log),
-    upr_nivel  = exp(upr_log)
+    pred_incond = exp(predict(modelo_incondicional, newdata = rango_edad2)),
+    horas_trabajadas = median(base_analisis$horas_trabajadas, na.rm = TRUE),
+    tipo_ocupacion = as.numeric(names(sort(table(base_analisis$tipo_ocupacion), decreasing = TRUE))[1])
   )
 
-# 3. Punto de la edad pico, usando el resultado del bootstrap
-edad_pico_valor <- edad_pico_incond  # o edad_pico, según cómo lo llamaste
-ingreso_pico <- exp(predict(modelo_incondicional,
-                            newdata = tibble(edad = edad_pico_valor)))
+rango_edad2$pred_cond <- exp(predict(modelo_condicional, newdata = rango_edad2))
 
-ggplot(rango_edad, aes(x = edad)) +
-  geom_ribbon(aes(ymin = lwr_nivel, ymax = upr_nivel), fill = "gray85") +
-  geom_line(aes(y = pred_nivel, color = "Ingreso predicho"), linewidth = 1) +
-  geom_line(aes(y = lwr_nivel, color = "Límite inferior"), linetype = "dashed") +
-  geom_line(aes(y = upr_nivel, color = "Límite superior"), linetype = "dashed") +
-  annotate("segment", x = edad_pico_valor, xend = edad_pico_valor,
-           y = 0, yend = ingreso_pico,
-           color = "#C51B8A", linetype = "dashed") +
-  geom_point(data = tibble(edad = edad_pico_valor, y = ingreso_pico),
-             aes(x = edad, y = y, color = "Edad pico"), size = 3) +
-  annotate("text", x = edad_pico_valor, y = ingreso_pico * 1.05,
-           label = round(edad_pico_valor, 1), fontface = "italic") +
-  scale_color_manual(
-    name = NULL,
-    values = c("Edad pico" = "#C51B8A", "Ingreso predicho" = "#08306B",
-               "Límite inferior" = "#6A51A3", "Límite superior" = "#6A51A3"),
-    breaks = c("Edad pico", "Ingreso predicho", "Límite inferior", "Límite superior")
-  ) +
+# 0.3. Ingreso en el pico de cada modelo, para marcar el punto
+ingreso_pico_incond <- exp(predict(modelo_incondicional, newdata = tibble(edad = edad_pico_incond)))
+
+ingreso_pico_cond <- exp(predict(modelo_condicional, newdata = tibble(
+  edad = edad_pico_cond,
+  horas_trabajadas = median(base_analisis$horas_trabajadas, na.rm = TRUE),
+  tipo_ocupacion = as.numeric(names(sort(table(base_analisis$tipo_ocupacion), decreasing = TRUE))[1])
+)))
+
+# 0.4. Gráfico: dos curvas, sin banda de confianza, cada una con su pico marcado
+grafico_perfiles <- ggplot(rango_edad2, aes(x = edad)) +
+  geom_line(aes(y = pred_incond, color = "Incondicional"), linewidth = 1.1) +
+  geom_line(aes(y = pred_cond, color = "Condicional"), linewidth = 1.1) +
+  annotate("segment", x = edad_pico_incond, xend = edad_pico_incond,
+           y = 0, yend = ingreso_pico_incond, color = "#08306B", linetype = "dashed") +
+  annotate("segment", x = edad_pico_cond, xend = edad_pico_cond,
+           y = 0, yend = ingreso_pico_cond, color = "#C51B8A", linetype = "dashed") +
+  annotate("point", x = edad_pico_incond, y = ingreso_pico_incond, color = "#08306B", size = 3) +
+  annotate("point", x = edad_pico_cond, y = ingreso_pico_cond, color = "#C51B8A", size = 3) +
+  annotate("text", x = edad_pico_incond, y = ingreso_pico_incond,
+           label = paste0(round(edad_pico_incond, 1)), vjust = -1.2, size = 3.3, color = "#08306B") +
+  annotate("text", x = edad_pico_cond, y = ingreso_pico_cond,
+           label = paste0(round(edad_pico_cond, 1)), vjust = -1.2, size = 3.3, color = "#C51B8A") +
+  scale_color_manual(name = NULL, values = c("Incondicional" = "#08306B", "Condicional" = "#C51B8A")) +
   scale_y_continuous(labels = scales::comma_format(big.mark = ".", decimal.mark = ",")) +
   labs(
     x = "Edad",
     y = "Ingreso mensual predicho (COP)",
-    caption = "Nota: la figura muestra los valores predichos de ingreso laboral para cada\nedad con su intervalo de confianza al 95%, y la edad pico obtenida mediante bootstrap."
+    caption = "Nota: perfiles predichos por edad. El condicional fija horas trabajadas\ny tipo de ocupación en sus valores más comunes de la muestra."
   ) +
   theme_classic() +
-  theme(
-    legend.position = "right",
-    legend.title = element_blank(),
-    plot.caption = element_text(hjust = 0, size = 9)
-  )
+  theme(legend.position = "right", plot.caption = element_text(hjust = 0, size = 9))
 
-ggsave("perfil_edad_ingreso.png", width = 8, height = 5, dpi = 300)
+print(grafico_perfiles)
+ggsave(
+  filename = file.path(root, "03_outputs", "perfiles_edad_ingreso.png"),
+  plot = grafico_perfiles,
+  width = 8, height = 5, dpi = 300
+)
 
+print(grafico_perfiles)
+ggsave(
+  filename = file.path(root, "03_outputs", "perfiles_edad_ingreso.png"),
+  plot = grafico_perfiles,
+  width = 8, height = 5, dpi = 300
+)
