@@ -18,8 +18,8 @@ library(purrr)
 
 #Estadisticas Descriptivas------------------------------------------------------
 base_analisis <- base_analisis %>% mutate(log_ingreso = log(ingreso_total))
-continuous_vars <- c("log_ingreso", "ans_educ", "edad", "experiencia_pot")
-discrete_vars   <- c("sexo", "nivel_educ", "estrato_energia")
+continuous_vars <- c("log_ingreso", "ans_educ", "edad", "exp_potencial")
+discrete_vars   <- c("mujer", "nivel_educ", "estrato_energia")
 
 # --- Función para estadísticas continuas ---
 stats_continuas <- function(df, vars) {
@@ -59,8 +59,8 @@ stats_discretas <- function(df, vars, var_salario = "log_ingreso") {
 }
 
 # --- Subconjuntos (ajusta los valores según cómo esté codificado 'sexo') ---
-base_hombres <- base_analisis %>% filter(sexo == 0)
-base_mujeres <- base_analisis %>% filter(sexo == 1)
+base_hombres <- base_analisis %>% filter(mujer == 0)
+base_mujeres <- base_analisis %>% filter(mujer == 1)
 
 # --- Tabla de continuas ---
 tabla_continuas <- bind_rows(
@@ -93,7 +93,7 @@ stargazer(as.data.frame(tabla_discretas), type = "text", summary = FALSE, rownam
 #Modelo uncicamente con brecha de genero
 #Modelo brecha de genero--------------------------------------------------------
 Modelo_brecha <- lm(
-  log(ingreso_total) ~ sexo,
+  log(ingreso_total) ~ mujer,
   data = base_analisis
 )
 
@@ -107,7 +107,7 @@ stargazer(
   dep.var.labels = "Logaritmo del ingreso mensual",
   
   covariate.labels = c(
-    "Sexo"
+    "Mujer"
   ),
   
   ci = TRUE,
@@ -135,12 +135,12 @@ calcular_model_incond_boot <- function(data, indices) {
   
   # 2. Estimar el mismo modelo en la muestra bootstrap
   modelo_boot <- lm(
-    log(ingreso_total) ~ sexo,
+    log(ingreso_total) ~ mujer,
     data = muestra_boot
   )
   
   # 3. Extraer el coeficiente de sexo
-  coef_sexo <- coef(modelo_boot)["sexo"]
+  coef_sexo <- coef(modelo_boot)["mujer"]
   
   # 4. Devolverlo
   return(coef_sexo)
@@ -161,10 +161,10 @@ boot_sexo$t0
 boot_sexo$t
 
 # Sesgo bootstrap
-bias_boot_sexo <- mean(boot_gap$t) - boot_gap$t0
+bias_boot_sexo <- mean(boot_sexo$t) - boot_sexo$t0
 
 # Error estándar bootstrap
-se_boot_sexo <- sd(boot_gap$t)
+se_boot_sexo <- sd(boot_sexo$t)
 
 #Intervalos de confianza bootstrap
 IC_boot_sexo <- boot.ci(
@@ -185,11 +185,11 @@ Transformación_IC_superior
 
 #Interpretación ----------------------------------------------------------------
 # Resultado porcentual 
-Transformación_Beta <- ((exp(coef(Modelo_brecha)["sexo"]) - 1) * 100)
+Transformación_Beta <- ((exp(coef(Modelo_brecha)["mujer"]) - 1) * 100)
 Transformación_Beta
 
 #Interpretación del Coeficiente
-#En promedio, el salario de las mujeres es 21,71% mas bajo en comparación a los 
+#En promedio, el salario de las mujeres es 21,17% mas bajo en comparación a los 
 #hombres. Tenemos una confianza del 95% de que el efecto poblacional de la 
 #discriminación salarial estara entre (-0,267, -0,209).
 
@@ -204,8 +204,8 @@ Transformación_Beta
 
 #Modelo de genero con controles-------------------------------------------------
 modelo_gap_controles <- lm(
-  log(ingreso_total) ~ sexo + nivel_educ + nivel_educ:ans_educ + 
-    experiencia_pot + I(experiencia_pot^2) + factor(estrato_energia),
+  log(ingreso_total) ~ mujer + nivel_educ + nivel_educ:ans_educ + 
+    exp_potencial + I(exp_potencial^2) + factor(estrato_energia),
   data = base_analisis
 )
 
@@ -219,7 +219,7 @@ stargazer(
   dep.var.labels = "Logaritmo del ingreso mensual",
   
   covariate.labels = c(
-    "Sexo"
+    "Mujer"
   ),
   
   ci = TRUE,
@@ -248,14 +248,14 @@ calcular_gap_boot <- function(data, indices) {
   
   # 2. Estimar el mismo modelo en la muestra bootstrap
   modelo_boot <- lm(
-    log(ingreso_total) ~ sexo + nivel_educ + nivel_educ:ans_educ + 
-      experiencia_pot + I(experiencia_pot^2) + 
+    log(ingreso_total) ~ mujer + nivel_educ + nivel_educ:ans_educ + 
+      exp_potencial + I(exp_potencial^2) + 
       factor(estrato_energia),
     data = muestra_boot
   )
   
   # 3. Extraer el coeficiente de sexo
-  coef_sexo <- coef(modelo_boot)["sexo"]
+  coef_sexo <- coef(modelo_boot)["mujer"]
   
   # 4. Devolverlo
   return(coef_sexo)
@@ -290,7 +290,7 @@ IC_boot_gap
 
 #Interpretación ----------------------------------------------------------------
 # Resultado porcentual 
-Transformación_Beta_gap <- ((exp(coef(modelo_gap_controles)["sexo"]) - 1) * 100)
+Transformación_Beta_gap <- ((exp(coef(modelo_gap_controles)["mujer"]) - 1) * 100)
 Transformación_Beta_gap
 
 #Transformacion de los intervalos boot
@@ -340,7 +340,7 @@ Transformación_IC_superior_gap
 #Paso 1) Obterner los residuos de Y
 modelo_y <- lm(
   log(ingreso_total) ~ nivel_educ + nivel_educ:ans_educ  + 
-    experiencia_pot + I(experiencia_pot^2) + factor(estrato_energia), 
+    exp_potencial + I(exp_potencial^2) + factor(estrato_energia), 
   data = base_analisis
 ) 
 
@@ -349,8 +349,8 @@ res_y <- residuals(modelo_y) #Esto es igual a M2*Y
 
 #Paso 2) Obtener los residuos de X1
 modelo_sex <- lm(
-  sexo ~ nivel_educ + nivel_educ:ans_educ  + 
-    experiencia_pot + I(experiencia_pot^2) + factor(estrato_energia),
+  mujer ~ nivel_educ + nivel_educ:ans_educ  + 
+    exp_potencial + I(exp_potencial^2) + factor(estrato_energia),
   data = base_analisis
 )
 
@@ -389,7 +389,7 @@ stargazer(
 )
 
 #Confirmación de resultados
-coef(modelo_gap_controles)["sexo"]
+coef(modelo_gap_controles)["mujer"]
 coef(fwl_sex)["res_sex"]
 beta_fwl <- coef(fwl_sex)["res_sex"]
 
@@ -400,7 +400,8 @@ summary(fwl_sex)$coefficients["res_sex", "Std. Error"]
 #El SE que da R por defecto NO es correcto: usa grados de libertad de una regresión
 #de 2 parámetros (n-2), en vez de los grados de libertad reales del modelo completo 
 #(n-k, con todos los controles).Hay que corregirlo manualmente.
-
+n_model <-nobs(modelo_gap_controles)
+k<- sum(!is.na(coef(modelo_gap_controles)))     # parámetros efectivamente estimados
 df <- n_model - k #Grados de libertad
 
 sigma2 <- sum(residuals(modelo_gap_controles)^2) / df 
@@ -423,7 +424,7 @@ FWL_boot <- function(data, indices) {
   # 3. Regresión de Y sobre todos los controles
   modelo_y <- lm(
     log_ingreso ~ nivel_educ + nivel_educ:ans_educ +
-      experiencia_pot + I(experiencia_pot^2) +
+      exp_potencial + I(exp_potencial^2) +
       factor(estrato_energia),
     data = muestra_boot
   )
@@ -434,8 +435,8 @@ FWL_boot <- function(data, indices) {
   
   # 4. Regresión de sexo sobre todos los controles
   modelo_sexo <- lm(
-    sexo ~ nivel_educ + nivel_educ:ans_educ +
-      experiencia_pot + I(experiencia_pot^2) +
+    mujer ~ nivel_educ + nivel_educ:ans_educ +
+      exp_potencial + I(exp_potencial^2) +
       factor(estrato_energia),
     data = muestra_boot
   )
@@ -484,4 +485,207 @@ IC_boot_gap_FWL <- boot.ci(
   type = "perc"
 )
 IC_boot_gap_FWL
+
+library(tidyverse)
+library(boot)
+
+
+# MODELO CONDICIONAL PREFERIDO — sexo interactuado con edad---------------------
+
+# Se interactúa sexo con edad y edad^2 para permitir que el perfil
+# completo (no solo el intercepto) difiera por sexo, manteniendo
+# los mismos controles usados en la especificación principal.
+
+modelo_edad <- lm(
+  log(ingreso_total) ~ mujer * edad + mujer * I(edad^2) +
+    nivel_educ + nivel_educ:ans_educ + factor(estrato_energia),
+  data = base_analisis
+)
+
+summary(modelo_edad)
+
+
+# 2. GRID DE PREDICCIÓN — persona representativa, variando solo edad y sexo ----
+
+# Se fija el resto de covariables en un perfil representativo
+# (nivel educativo y estrato más frecuentes en la muestra) para
+# aislar exclusivamente el efecto de edad y sexo sobre el perfil.
+
+nivel_representativo   <- names(sort(table(base_analisis$nivel_educ), decreasing = TRUE))[1]
+estrato_representativo <- names(sort(table(base_analisis$estrato_energia), decreasing = TRUE))[1]
+ans_educ_representativo <- median(base_analisis$ans_educ[base_analisis$nivel_educ == nivel_representativo], na.rm = TRUE)
+
+# 2. GRID DE PREDICCIÓN —-------------------------------------------------------
+grid_pred <- expand.grid(
+  edad  = seq(18, 90, by = 1),
+  mujer = c(0, 1)
+) %>%
+  mutate(
+    nivel_educ      = nivel_representativo,
+    ans_educ        = ans_educ_representativo,
+    estrato_energia = as.numeric(estrato_representativo)
+  )
+
+pred <- predict(modelo_edad, newdata = grid_pred, se.fit = TRUE)
+
+grid_pred <- grid_pred %>%
+  mutate(
+    log_pred = pred$fit,
+    se       = pred$se.fit,
+    ingreso_pred = exp(log_pred),
+    ci_low   = exp(log_pred - 1.96 * se),
+    ci_high  = exp(log_pred + 1.96 * se),
+    Sexo = factor(mujer, levels = c(0, 1), labels = c("H", "M")))
+
+
+
+# 3. EDAD PICO ANALÍTICA -------------------------------------------------------
+coefs <- coef(modelo_edad)
+
+# Hombres (sexo = 0, categoría BASE): coeficientes sin interacción
+b_edad_h  <- coefs["edad"]
+b_edad2_h <- coefs["I(edad^2)"]
+peak_age_h <- -b_edad_h / (2 * b_edad2_h)
+
+# Mujeres (sexo = 1): coeficientes base + interacción
+b_edad_m  <- coefs["edad"] + coefs["mujer:edad"]
+b_edad2_m <- coefs["I(edad^2)"] + coefs["mujer:I(edad^2)"]
+peak_age_m <- -b_edad_m / (2 * b_edad2_m)
+
+c(Hombres = peak_age_h, Mujeres = peak_age_m)
+
+
+# 4. BOOTSTRAP ----------------------------------------------------------------
+peak_age_boot <- function(data, indices) {
+  
+  # 1. Muestra bootstrap
+  muestra_boot <- data[indices, ]
+  
+  
+  # 2. Crear variables necesarias
+  muestra_boot$log_ingreso <- log(muestra_boot$ingreso_total)
+  
+  
+  # 3. Modelo condicional de edad, interactuado con mujer
+  modelo_edad_boot <- lm(
+    log_ingreso ~ mujer * edad + mujer * I(edad^2) +
+      nivel_educ + nivel_educ:ans_educ +
+      factor(estrato_energia),
+    data = muestra_boot
+  )
+  
+  # Coeficientes de esta réplica
+  cf <- coef(modelo_edad_boot)
+  
+  
+  # 4. Verificación de que los coeficientes necesarios existen y son estimables
+  req <- c("edad", "I(edad^2)", "mujer:edad", "mujer:I(edad^2)")
+  if (any(!req %in% names(cf)) || any(is.na(cf[req]))) {
+    return(c(NA_real_, NA_real_))
+  }
+  
+  
+  # 5. Edad pico para hombres (mujer = 0, categoría base)
+  peak_h <- -cf["edad"] / (2 * cf["I(edad^2)"])
+  
+  # Edad pico para mujeres (mujer = 1, base + interacción)
+  peak_m <- -(cf["edad"] + cf["mujer:edad"]) /
+    (2 * (cf["I(edad^2)"] + cf["mujer:I(edad^2)"]))
+  
+  
+  # 6. Devolver ambas edades pico
+  return(c(peak_h, peak_m))
+}
+
+
+set.seed(123) #Semilla
+
+boot_peak_age <- boot(
+  data = base_analisis,
+  statistic = peak_age_boot,
+  R = 1000
+)
+
+# Coeficientes (edades pico) del modelo original
+boot_peak_age$t0
+
+# Distribución de las 1000 réplicas (columna 1 = hombres, columna 2 = mujeres)
+boot_peak_age$t
+
+# Réplicas fallidas (por singularidad en alguna submuestra)
+sum(is.na(boot_peak_age$t[,1]))
+
+# Sesgo bootstrap
+bias_boot_peak_h <- mean(boot_peak_age$t[,1], na.rm = TRUE) - boot_peak_age$t0[1]
+bias_boot_peak_m <- mean(boot_peak_age$t[,2], na.rm = TRUE) - boot_peak_age$t0[2]
+c(Hombres = bias_boot_peak_h, Mujeres = bias_boot_peak_m)
+
+# Error estándar bootstrap
+se_boot_peak_h <- sd(boot_peak_age$t[,1], na.rm = TRUE)
+se_boot_peak_m <- sd(boot_peak_age$t[,2], na.rm = TRUE)
+c(Hombres = se_boot_peak_h, Mujeres = se_boot_peak_m)
+
+# Intervalos de confianza bootstrap — uno por índice (1 = hombres, 2 = mujeres)
+IC_boot_peak_h <- boot.ci(boot_peak_age, type = "perc", index = 1)
+IC_boot_peak_m <- boot.ci(boot_peak_age, type = "perc", index = 2)
+
+IC_boot_peak_h
+IC_boot_peak_m
+
+
+
+# 5. INGRESO PREDICHO EN LA EDAD PICO — nombres de variable corregidos------
+ingreso_pico_h <- grid_pred %>% filter(Sexo == "H") %>%
+  slice_min(abs(edad - peak_age_h)) %>% pull(ingreso_pred)
+ingreso_pico_m <- grid_pred %>% filter(Sexo == "M") %>%
+  slice_min(abs(edad - peak_age_m)) %>% pull(ingreso_pred)
+
+puntos_pico <- data.frame(
+  Sexo = c("H", "M"),
+  edad = c(peak_age_h, peak_age_m),
+  ingreso_pred = c(ingreso_pico_h, ingreso_pico_m)
+)
+
+# 6. GRÁFICO — mismo formato que la figura de referencia
+
+
+colores <- c("M" = "#B5348C", "H" = "#2E4FA3")
+
+grafico_perfil <- ggplot(grid_pred, aes(x = edad, y = ingreso_pred, color = Sexo, fill = Sexo)) +
+  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.15, color = NA) +
+  geom_line(linewidth = 0.9) +
+  geom_point(data = puntos_pico, size = 2.4) +
+  geom_segment(data = puntos_pico,
+               aes(x = edad, xend = edad, y = -Inf, yend = ingreso_pred),
+               linetype = "dashed", linewidth = 0.4, show.legend = FALSE) +
+  geom_text(data = puntos_pico,
+            aes(x = edad, y = ingreso_pred, label = round(edad, 1)),
+            vjust = -1, size = 3, show.legend = FALSE) +
+  scale_color_manual(values = colores,
+                     labels = c("M" = "Ingreso predicho M", "H" = "Ingreso predicho H")) +
+  scale_fill_manual(values = colores, guide = "none") +
+  labs(x = "Edad", y = "Ingreso predicho(COP)", color = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position   = "bottom",
+    legend.title      = element_blank(),
+    plot.title        = element_blank(),
+    plot.margin       = margin(4, 4, 4, 4),
+    
+    # ---- quita la cuadrícula de fondo ----
+    panel.grid.major  = element_blank(),
+    panel.grid.minor  = element_blank(),
+    
+    # ---- muestra los ejes con línea y marcas (ticks) ----
+    axis.line         = element_line(color = "black", linewidth = 0.4),
+    axis.ticks        = element_line(color = "black", linewidth = 0.4),
+    axis.ticks.length  = unit(4, "pt")
+  )
+
+grafico_perfil
+
+
+ggsave("perfil_edad_ingreso.png", plot = grafico_perfil,
+       width = 4.6, height = 3.6, units = "in", dpi = 300, bg = "white")
+
 

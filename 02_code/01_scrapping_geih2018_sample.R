@@ -40,6 +40,7 @@ if (!require("pacman")) { # si no se puede cargar, require==FALSE
 p_load(rstudioapi)
 library(rstudioapi)
 
+
 # (0.1) Obtener la ruta completa del script actual
 ruta_script <- rstudioapi::getActiveDocumentContext()$path
 
@@ -63,7 +64,7 @@ setwd(root)
 # ------------------------------------------------------------------------------
 
 # (1.1) Definir los paquetes requeridos
-paquetes <- c("httr", "rvest", "dplyr", "writexl")
+paquetes <- c("httr", "rvest", "dplyr", "writexl","stringr","purrr")
 
 p_load(paquetes)
 

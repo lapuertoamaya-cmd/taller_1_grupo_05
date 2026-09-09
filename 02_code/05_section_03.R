@@ -586,4 +586,135 @@ ggplot(
   )
 ggsave("03_outputs/03.9_vars_importance.png")
 
+#-------------------------------------------------------------------------------
+# (8) dependencia de las vars mas improtantes
+#-------------------------------------------------------------------------------
+
+var_imp <- "horas_trabajadas"
+
+grid <- seq(
+  min(training[[var_imp]], na.rm = TRUE),
+  max(training[[var_imp]], na.rm = TRUE),
+  length.out = 100
+)
+
+dependencia <- map_dfr(grid, function(x) {
+  
+  d <- training
+  d[[var_imp]] <- x
+  
+  tibble(
+    valor = x,
+    pred = mean(predict(rma18, newdata = d), na.rm = TRUE)
+  )
+})
+
+dep_h_tr <-ggplot(dependencia, aes(x = valor, y = pred)) +
+  geom_line() +
+  labs(
+    x = "Horas trabajadas",
+    y = "Log ingreso predicho"
+  ) +
+  theme_classic(base_family = "serif")
+
+var_imp <- "ans_educ"
+
+grid <- seq(
+  min(training[[var_imp]], na.rm = TRUE),
+  max(training[[var_imp]], na.rm = TRUE),
+  length.out = 100
+)
+
+dependencia <- map_dfr(grid, function(x) {
+  
+  d <- training
+  d[[var_imp]] <- x
+  
+  tibble(
+    valor = x,
+    pred = mean(predict(rma18, newdata = d), na.rm = TRUE)
+  )
+})
+
+dep_edu <- ggplot(dependencia, aes(x = valor, y = pred)) +
+  geom_line() +
+  labs(
+    x = "Años de Educación",
+    y = "Log ingreso predicho"
+  ) +
+  theme_classic(base_family = "serif")
+
+
+var_imp <- "horas_trabajadas"
+
+grid <- expand_grid(
+  horas_trabajadas = seq(
+    min(training$horas_trabajadas),
+    max(training$horas_trabajadas),
+    length.out = 100
+  ),
+  estrato_energia = sort(unique(training$estrato_energia))
+)
+
+dependencia <- pmap_dfr(grid, function(horas_trabajadas, estrato_energia) {
+  
+  d <- training
+  d$horas_trabajadas <- horas_trabajadas
+  d$estrato_energia <- estrato_energia
+  
+  tibble(
+    horas_trabajadas = horas_trabajadas,
+    estrato_energia = estrato_energia,
+    pred = mean(predict(rma18, newdata = d), na.rm = TRUE)
+  )
+})
+
+dep_h_tr_estrato <- ggplot(
+  dependencia,
+  aes(
+    x = horas_trabajadas,
+    y = pred,
+    color = factor(estrato_energia)
+  )
+) +
+  geom_line() +
+  labs(
+    x = "Horas trabajadas",
+    y = "Log ingreso predicho",
+    color = "Estrato"
+  ) +
+  theme_classic(base_family = "serif")
+
+var_imp <- "estrato_energia"
+
+grid <- seq(
+  min(training[[var_imp]], na.rm = TRUE),
+  max(training[[var_imp]], na.rm = TRUE),
+  length.out = 100
+)
+
+dependencia <- map_dfr(grid, function(x) {
+  
+  d <- training
+  d[[var_imp]] <- x
+  
+  tibble(
+    valor = x,
+    pred = mean(predict(rma18, newdata = d), na.rm = TRUE)
+  )
+})
+
+dep_estrato <- ggplot(dependencia, aes(x = valor, y = pred)) +
+  geom_line() +
+  labs(
+    x = "Estrato",
+    y = "Log ingreso predicho"
+  ) +
+  theme_classic(base_family = "serif")
+
+
+ggsave("03_outputs/03.10_dependencia_y_h_tr.png", plot=dep_h_tr_estrato)
+ggsave("03_outputs/03.11_dependencia_ans_educ.png", plot=dep_edu)
+ggsave("03_outputs/03.12_dependencia_estrat.png", plot=dep_estrato)
+
 # FIN
