@@ -281,17 +281,17 @@ bias_boot_gap <- mean(boot_gap$t) - boot_gap$t0
 # Error estándar bootstrap
 se_boot_gap <- sd(boot_gap$t)
 
-#Interpretación ----------------------------------------------------------------
-# Resultado porcentual 
-Transformación_Beta_gap <- ((exp(coef(modelo_gap_controles)["sexo"]) - 1) * 100)
-Transformación_Beta_gap
-
 #Intervalos de confianza bootstrap
 IC_boot_gap <- boot.ci(
   boot_gap,
   type = "perc"
 )
-IC_boot_sexo
+IC_boot_gap
+
+#Interpretación ----------------------------------------------------------------
+# Resultado porcentual 
+Transformación_Beta_gap <- ((exp(coef(modelo_gap_controles)["sexo"]) - 1) * 100)
+Transformación_Beta_gap
 
 #Transformacion de los intervalos boot
 limite_inferior <- IC_boot_gap$percent[4]
@@ -393,6 +393,9 @@ coef(modelo_gap_controles)["sexo"]
 coef(fwl_sex)["res_sex"]
 beta_fwl <- coef(fwl_sex)["res_sex"]
 
+#Error estandar del modelo
+summary(fwl_sex)$coefficients["res_sex", "Std. Error"]
+
 #Error estandar analitico FWL --------------------------------------------------
 #El SE que da R por defecto NO es correcto: usa grados de libertad de una regresión
 #de 2 parámetros (n-2), en vez de los grados de libertad reales del modelo completo 
@@ -403,6 +406,7 @@ df <- n_model - k #Grados de libertad
 sigma2 <- sum(residuals(modelo_gap_controles)^2) / df 
 se_analitico <- sqrt(sigma2 / sum(res_sex^2))
 se_analitico
+
 
 #Bootstrap----------------------------------------------------------------------
 FWL_boot <- function(data, indices) {
@@ -473,4 +477,11 @@ bias_boot_FWL
 # Error estándar bootstrap
 se_boot_FWL <- sd(boot_FWL$t)
 se_boot_FWL
+
+#Intervalos de confianza bootstrap
+IC_boot_gap_FWL <- boot.ci(
+  boot_FWL,
+  type = "perc"
+)
+IC_boot_gap_FWL
 
