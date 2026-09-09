@@ -24,8 +24,7 @@ if (!require("pacman")) { # si no se puede cargar, require==FALSE
   library(pacman)
 }
 
-p_load(rstudioapi)
-library(rstudioapi)
+p_load(rstudioapi, readxl, tidyverse)
 
 # (0.1) Obtener la ruta completa del script actual
 ruta_script <- rstudioapi::getActiveDocumentContext()$path
@@ -49,15 +48,6 @@ setwd(root)
 # (1) importar paquetes necesarios
 # ------------------------------------------------------------------------------
 
-if (!require("tidyverse")) { # si no se puede cargar, require==FALSE
-  install.packages("tidyverse")
-  library(tidyverse)
-}
-
-if (!require("readxl")) { # si no se puede cargar, require==FALSE
-  install.packages("readxl")
-  library(readxl)
-}
 
 # ------------------------------------------------------------------------------
 # (2) Restriccion de la muestra a mayores de edad, ocupados con ingresos positivos
@@ -78,7 +68,7 @@ print(muestra)
 # ------------------------------------------------------------------------------
 
 # (3.1) vector de vars relevantes
-text_vars <- c('edad' = 'age', 'sexo' = 'sex', 'estrato_energia' = 'estrato1', 
+text_vars <- c('edad' = 'age', 'hombre' = 'sex', 'estrato_energia' = 'estrato1', 
                'tipo_ocupacion' = 'relab',
                'maximo_nivel_educativo' = 'maxEducLevel', 
                'ocupado' = 'ocu',
@@ -136,7 +126,10 @@ base_analisis <- base_analisis %>%
     edu_may_10 = ifelse(ans_educ>10,1,0),
     
     # (3.2.7) ocupacion como factor
-    tipo_ocupacion = factor(tipo_ocupacion)
+    tipo_ocupacion = factor(tipo_ocupacion),
+    
+    # (3.2.8) mujer
+    mujer = ifelse(hombre,0,1)
   )
 
 View(base_analisis)

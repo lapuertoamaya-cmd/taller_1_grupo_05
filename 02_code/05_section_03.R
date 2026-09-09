@@ -215,7 +215,7 @@ corr_plot <- mat_corr |>
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-ggsave("03_outputs/03.1_corr_variables.png", plot=corr_plot)
+ggsave("03_outputs/03.0_corr_variables.png", plot=corr_plot)
 
 # (4.2) visualizacion de correlaciones concretas con el ingreso
 
@@ -235,7 +235,8 @@ visualizador_train_factor <- function(var,label) {
 }
 
 # (4.2.1) edad
-visualizador_train_corr("edad", "Edad", "darkblue")
+edad1 <- visualizador_train_corr("edad", "Edad", "darkblue")
+ggsave("03_outputs/03.1_corr_edad.png", plot=edad1)
 
 # (4.2.3) edu
 edu <- visualizador_train_corr("ans_educ", "Años de Educación", "darkgreen")
@@ -263,27 +264,49 @@ ggsave("03_outputs/03.7_corr_horas_trabajadas.png", plot=horas)
 # (5) estimacion principal de modelos
 # ------------------------------------------------------------------------------
 
+estimacion_modelos <- function(data,X, train=TRUE) {
+  if (train) {
+    modelo <- lm(ln_,data=training)
+    
+  }
+  else {
+    
+  }
+}
+estimacion_test
+
 # (5.1) modelo de edad incondicional
+m1.1 <- lm(, data=t)
+
+# (5.2) modelo de edad condicional
+m1.2 <-
 
 modelo_incondicional <- lm(log(ingreso_total) ~ edad + I(edad^2), data = base_analisis)
 
-# (5.4) modelo de genero condicional
+# (5.3) modelo genero incondicional
+m2.1 <-
 
+  
+# (5.4) modelo de genero condicional
+m2.2 <-
 
 # (5.5) modelo adicional 1
-
+ma1 <-
 
 # (5.6) modelo adicional 2
-
+ma2 <-
+  
 # (5.7) modelo adicional 3
-
+ma3 <-
+  
 # (5.8) modelo adicional 4
+ma4 <-
 
 # (5.9) modelo adicional 5
-
+ma5 <-
 
 # ------------------------------------------------------------------------------
-# (6) xxx
+# (6) 
 # ------------------------------------------------------------------------------
 
 
@@ -367,6 +390,6 @@ modelo_educ_dummy_edad2 <- lm(ln_ingreso_total ~ ans_educ*edu_may_10 + edad + I(
 summary(modelo_educ_dummy_edad)
 summary(modelo_educ_dummy_edad2)
 
-
+table(base_analisis$grado_escolar_aprobado, base_analisis$maximo_nivel_educativo)
 
 
